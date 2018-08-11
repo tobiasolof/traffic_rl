@@ -8,20 +8,21 @@ import tensorflow as tf
 from city import City
 
 
-NR_EPISODES = 10000
+NR_EPISODES = 20000
 REPLAY_SIZE = 16
 TERMINATE_FREQ = 2
 ACTION_FREQ = 50
 DRAW_FREQ = 5
 DRAW_FREQ_EPOCH = 10
-NR_CARS = 5
+NR_CARS = 10
+DIMENSIONS = (4, 3)
 
 
 # Inspired by https://keon.io/deep-q-learning/
 class TrafficQNAgent:
 
     def __init__(self):
-        self.env = City()
+        self.env = City(stepsize=0.01, dimensions=DIMENSIONS)
         self.state_size = 1 + len(self.env.intersections) * 4 * 3
         self.action_size = len(self.env.intersections) * 4
         self.memory = deque(maxlen=2000)
@@ -30,7 +31,6 @@ class TrafficQNAgent:
         self.epsilon_min = 0.01
         self.epsilon_decay = (self.epsilon_min / self.epsilon) ** (1.25 / NR_EPISODES)
         self.timestamp = time.strftime('%Y%m%d-%H%M', time.localtime())
-        self.writer = tf.summary.FileWriter(f'./logs/{self.timestamp}/')
         self.model = self._build_model()
 
     # Define neural network
@@ -85,7 +85,10 @@ class TrafficQNAgent:
 
     # Run agent
     def run(self, train=False, nr_cars=NR_CARS, nr_episodes=NR_EPISODES,
-            terminate_freq=TERMINATE_FREQ, visualize=False):
+            terminate_freq=TERMINATE_FREQ, visualize=False, write=True):
+
+        # Define writer
+        writer = tf.summary.FileWriter(f'./logs/{self.timestamp}/')
 
         # Create window
         if visualize:
@@ -132,17 +135,18 @@ class TrafficQNAgent:
                 self.replay(REPLAY_SIZE)
 
             # Write to TensorBoard
-            tag_prefix = '' if train else 'test_'
-            self.writer.add_summary(
-                tf.Summary(
-                    value=[tf.Summary.Value(tag=tag_prefix + 'reward', simple_value=reward)]
-                ),
-                epoch
-            )
-            self.writer.add_summary(tf.Summary(value=[
-                tf.Summary.Value(tag=tag_prefix + 'nr_cars', simple_value=len(self.env.cars))]),
-                                    epoch)
-            self.writer.flush()
+            if write:
+                tag_prefix = '' if train else 'test_'
+                writer.add_summary(
+                    tf.Summary(
+                        value=[tf.Summary.Value(tag=tag_prefix + 'wait', simple_value=-reward)]
+                    ),
+                    epoch
+                )
+                writer.add_summary(tf.Summary(value=[
+                    tf.Summary.Value(tag=tag_prefix + 'nr_cars', simple_value=len(self.env.cars))]),
+                                        epoch)
+                writer.flush()
 
             # Print progress
             print(round(100 * epoch / NR_EPISODES), '%', sep='', end='\r', flush=True)
@@ -161,5 +165,5 @@ class TrafficQNAgent:
 
 if __name__ == '__main__':
     agent = TrafficQNAgent()
-    agent.run(train=True, visualize=False)
+    agent.run(train=True, visualize=False, write=True)
     agent.run()

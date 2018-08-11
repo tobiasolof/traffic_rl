@@ -8,17 +8,16 @@ from intersection import Intersection
 
 class City(object):
 
-    def __init__(self, stepsize=0.01):
+    def __init__(self, stepsize=0.01, dimensions=(3, 3), static_open=None):
+        self.dimensions = dimensions
+        self.static_open = static_open or \
+                           [(x, y) for x in range(dimensions[0]) for y in range(dimensions[1])
+                            if x in (0, dimensions[0] - 1) or y in (0, dimensions[1] - 1)]
         self.intersections = []
-        self.intersections.append(Intersection(1, 1, static_open=True))
-        self.intersections.append(Intersection(1, 2, static_open=True))
-        self.intersections.append(Intersection(1, 3, static_open=True))
-        self.intersections.append(Intersection(2, 1, static_open=True))
-        self.intersections.append(Intersection(2, 2))
-        self.intersections.append(Intersection(2, 3, static_open=True))
-        self.intersections.append(Intersection(3, 1, static_open=True))
-        self.intersections.append(Intersection(3, 2, static_open=True))
-        self.intersections.append(Intersection(3, 3, static_open=True))
+        for x in range(self.dimensions[0]):
+            for y in range(self.dimensions[1]):
+                static_open = True if (x, y) in self.static_open else False
+                self.intersections.append(Intersection(x, y, static_open=static_open))
         self.cars = []
         self.stepsize = stepsize
         self.total_wait_time = 0
@@ -26,9 +25,12 @@ class City(object):
         # Set up window
         self.labels = []
         self.tk = tkinter.Tk()
-        self.tk.title('TrafficMap')
+        self.tk.title('City')
+        # Window stays on top of normal windows
         self.tk.wm_attributes("-topmost", 1)
-        self.tk.wm_geometry("%dx%d%+d%+d" % (500, 500, 0, 0))
+        # Window size
+        self.tk.wm_geometry("%dx%d%+d%+d" % (
+            100 * (self.dimensions[0] + 1), 100 * (self.dimensions[1] + 1), 0, 0))
 
     def update_positions(self, visualize=False):
         for i, c in enumerate(self.cars):
@@ -40,7 +42,7 @@ class City(object):
                 temp_label = tkinter.Label(name='car_{}'.format(i), image=square_im,
                                            compound=tkinter.NONE)
                 temp_label.image = square_im
-                temp_label.place(x=100 * c.x, y=100 * c.y, anchor=tkinter.CENTER)
+                temp_label.place(x=100 * (c.x + 1), y=100 * (c.y + 1), anchor=tkinter.CENTER)
                 self.labels.append(temp_label)
 
     def build_window(self):
@@ -54,8 +56,8 @@ class City(object):
                     temp_label = tkinter.Label(name=f'road_({i.x}_{i.y})-({j.x}_{j.y})',
                                                image=temp_line_im, compound=tkinter.NONE)
                     temp_label.image = temp_line_im
-                    mid_x = 100 * (min(i.x, j.x) + abs(i.x - j.x)/2)
-                    mid_y = 100 * (min(i.y, j.y) + abs(i.y - j.y)/2)
+                    mid_x = 100 * (min(i.x, j.x) + abs(i.x - j.x)/2 + 1)
+                    mid_y = 100 * (min(i.y, j.y) + abs(i.y - j.y)/2 + 1)
                     temp_label.place(x=mid_x, y=mid_y, anchor=tkinter.CENTER)
                     self.labels.append(temp_label)
 
@@ -65,7 +67,7 @@ class City(object):
             temp_label = tkinter.Label(name=f'intersection_{i.x}_{i.y}',
                                        image=square_im, compound=tkinter.NONE)
             temp_label.image = square_im
-            temp_label.place(x=100*i.x, y=100*i.y, anchor=tkinter.CENTER)
+            temp_label.place(x=100 * (i.x + 1), y=100 * (i.y + 1), anchor=tkinter.CENTER)
             self.labels.append(temp_label)
 
     def sum_wait_time(self):
@@ -98,7 +100,9 @@ if __name__ == '__main__':
     city.place_cars(n=10)
     while True:
         if random.random() < 0.01:
-            city.intersections[4].change_state()
+            for intersection in city.intersections:
+                if not intersection.static_open:
+                    intersection.change_state()
         city.sum_wait_time()
         city.update_positions(visualize=True)
         city.get_predictors(v=3)
